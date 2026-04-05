@@ -1,0 +1,8 @@
+{
+  "name": "Specchio Magico",
+  "description": "Een magische Italiaanse taalspiegel voor shadowing en conversatie met AI.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
