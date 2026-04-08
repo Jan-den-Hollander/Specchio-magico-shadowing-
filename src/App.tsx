@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { 
   Mic, 
@@ -42,7 +42,7 @@ export default function App() {
   const [level, setLevel] = useState('A2');
   const [topic, setTopic] = useState('dagelijks leven');
   const [score, setScore] = useState(0);
-  const [status, setStatus] = useState('Klaar · Klik ✨ om te starten');
+  const [status, setStatus] = useState('Klaar · Pronto');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [customKey, setCustomKey] = useState(localStorage.getItem('specchio_api_key') || '');
@@ -62,7 +62,7 @@ export default function App() {
     localStorage.setItem('specchio_api_key', key);
     setCustomKey(key);
     setShowKeyModal(false);
-    setStatus('API Key opgeslagen!');
+    setStatus('API Key opgeslagen! · Salvato!');
   };
 
   const prevMessagesLength = useRef(0);
@@ -83,7 +83,7 @@ export default function App() {
         videoRef.current.srcObject = null;
       }
       setIsCamOn(false);
-      setStatus('Spiegel uit.');
+      setStatus('Spiegel uit · Specchio disattivato');
     } else {
       try {
         setStatus('Camera opstarten...');
@@ -167,7 +167,7 @@ export default function App() {
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
 
-      recognitionRef.current.onstart = () => { setIsRecording(true); setStatus('Ik luister... Spreek nu Italiaans.'); };
+      recognitionRef.current.onstart = () => { setIsRecording(true); setStatus('Ik luister... · Ti ascolto...'); };
       recognitionRef.current.onresult = (event: any) => { setIsRecording(false); processHeard(event.results[0][0].transcript); };
       recognitionRef.current.onerror = (event: any) => { setIsRecording(false); setStatus('Microfoon fout.'); };
       recognitionRef.current.onend = () => { setIsRecording(false); };
@@ -235,12 +235,13 @@ export default function App() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   };
 
+  // LAY-OUT DIE SCROLLT OP KLEINE SCHERMEN
   return (
-    <div className="h-[100dvh] w-full bg-[#080810] text-[#f5f0e8] font-sans selection:bg-[#c9a84c]/30 overflow-hidden flex flex-col">
-      <div className="flex flex-col h-full max-w-md mx-auto w-full px-4 pt-3 pb-2 relative z-10">
+    <div className="min-h-screen w-full bg-[#080810] text-[#f5f0e8] font-sans selection:bg-[#c9a84c]/30 flex flex-col pb-8">
+      <div className="flex flex-col max-w-md mx-auto w-full px-4 pt-4 relative z-10">
         
         {/* Header */}
-        <header className="text-center pb-3 shrink-0">
+        <header className="text-center pb-4">
           <motion.h1 
             initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
             className="font-serif text-3xl font-light tracking-widest text-[#e8c97a] drop-shadow-[0_0_20px_rgba(201,168,76,0.3)]"
@@ -253,7 +254,7 @@ export default function App() {
         </header>
 
         {/* Mirror Section */}
-        <div className="relative mx-auto h-[28vh] min-h-[160px] max-h-[220px] aspect-[3/4] mb-3 shrink-0">
+        <div className="relative mx-auto w-full max-w-[200px] aspect-[3/4] mb-5">
           <div className="absolute inset-0 bg-gradient-to-br from-[#7a5810] via-[#c9a84c] to-[#5a3e08] rounded-[50%_50%_46%_46%_/_28%_28%_72%_72%] p-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.8)]">
             <div className="w-full h-full bg-[#111128] rounded-[47%_47%_44%_44%_/_26%_26%_74%_74%] overflow-hidden relative">
               <video 
@@ -276,22 +277,25 @@ export default function App() {
           
           <button 
             type="button" onClick={(e) => { e.preventDefault(); toggleCam(); }}
-            className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#080810] border border-[#c9a84c]/30 px-3 py-1 rounded-full text-[0.6rem] tracking-widest uppercase text-[#c9a84c]/80 flex items-center gap-1.5 z-20"
+            className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#080810] border border-[#c9a84c]/30 px-3 py-1.5 rounded-full text-[0.55rem] tracking-widest uppercase text-[#c9a84c]/80 flex flex-col items-center gap-0.5 z-20 w-[120px] text-center"
           >
-            {isCamOn ? <CameraOff size={10} /> : <Camera size={10} />}
-            {isCamOn ? 'Stop Spiegel' : 'Start Spiegel'}
+            <div className="flex items-center gap-1.5">
+              {isCamOn ? <CameraOff size={10} /> : <Camera size={10} />}
+              <span>{isCamOn ? 'Stop Spiegel' : 'Start Spiegel'}</span>
+            </div>
+            <span className="text-[0.45rem] opacity-60">{isCamOn ? 'Disattiva' : 'Attiva'}</span>
           </button>
         </div>
 
-        {/* Settings Row */}
-        <div className="grid grid-cols-2 gap-2 mb-3 shrink-0">
+        {/* Settings Row (Tweetalig) */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
           <div className="space-y-1">
             <label className="text-[0.55rem] uppercase tracking-widest text-[#c9a84c]/50 ml-1 flex items-center gap-1">
-              <Settings size={8} /> Niveau
+              <Settings size={8} /> Niveau · Livello
             </label>
             <select 
               value={level} onChange={(e) => setLevel(e.target.value)}
-              className="w-full bg-[#c9a84c]/5 border border-[#c9a84c]/20 rounded-lg px-2 py-1.5 text-[0.7rem] outline-none text-[#e8c97a]"
+              className="w-full bg-[#c9a84c]/5 border border-[#c9a84c]/20 rounded-lg px-2 py-2 text-[0.7rem] outline-none text-[#e8c97a]"
             >
               <option value="A1">A1 - Beginner</option>
               <option value="A2">A2 - Elementair</option>
@@ -301,11 +305,11 @@ export default function App() {
           </div>
           <div className="space-y-1">
             <label className="text-[0.55rem] uppercase tracking-widest text-[#c9a84c]/50 ml-1 flex items-center gap-1">
-              <MessageSquare size={8} /> Onderwerp
+              <MessageSquare size={8} /> Onderwerp · Tema
             </label>
             <select 
               value={topic} onChange={(e) => setTopic(e.target.value)}
-              className="w-full bg-[#c9a84c]/5 border border-[#c9a84c]/20 rounded-lg px-2 py-1.5 text-[0.7rem] outline-none text-[#e8c97a]"
+              className="w-full bg-[#c9a84c]/5 border border-[#c9a84c]/20 rounded-lg px-2 py-2 text-[0.7rem] outline-none text-[#e8c97a]"
             >
               <option value="dagelijks leven">Dagelijks Leven</option>
               <option value="restaurant">Restaurant</option>
@@ -316,8 +320,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* Action Row */}
-        <div className="flex items-center justify-center gap-6 mb-2 shrink-0">
+        {/* Action Row (Tweetalig) */}
+        <div className="flex items-center justify-center gap-6 mb-2">
           <div className="flex flex-col items-center gap-1">
             <button 
               type="button" onClick={() => messages.length > 0 && speakIt(messages[messages.length-1].it)}
@@ -325,7 +329,9 @@ export default function App() {
             >
               <Volume2 size={16} />
             </button>
-            <span className="text-[0.55rem] uppercase tracking-widest text-[#c9a84c]/60">Herhoor</span>
+            <span className="text-[0.5rem] uppercase tracking-widest text-[#c9a84c]/60 text-center leading-tight">
+              Herhoor<br/><span className="text-[#c9a84c]/40">Riascolta</span>
+            </span>
           </div>
 
           <div className="flex flex-col items-center gap-1">
@@ -337,8 +343,8 @@ export default function App() {
             >
               {isRecording ? <MicOff size={24} className="text-red-500" /> : <Mic size={24} className="text-[#080810]" />}
             </button>
-            <span className={`text-[0.6rem] uppercase tracking-widest font-bold ${isRecording ? 'text-red-500' : 'text-[#c9a84c]'}`}>
-              {isRecording ? 'Luisteren...' : 'Antwoorden'}
+            <span className={`text-[0.55rem] uppercase tracking-widest font-bold text-center leading-tight ${isRecording ? 'text-red-500' : 'text-[#c9a84c]'}`}>
+              {isRecording ? <>Luisteren...<br/><span className="opacity-60">Ascoltando</span></> : <>Antwoorden<br/><span className="opacity-60">Rispondi</span></>}
             </span>
           </div>
 
@@ -349,16 +355,18 @@ export default function App() {
             >
               <ChevronRight size={16} />
             </button>
-            <span className="text-[0.55rem] uppercase tracking-widest text-[#c9a84c]/60">Sla over</span>
+            <span className="text-[0.5rem] uppercase tracking-widest text-[#c9a84c]/60 text-center leading-tight">
+              Sla over<br/><span className="text-[#c9a84c]/40">Salta</span>
+            </span>
           </div>
         </div>
 
-        <div className="text-center shrink-0 mb-2">
+        <div className="text-center mb-3">
           <p className="text-[0.65rem] text-[#c9a84c]/60 min-h-[1em] italic font-medium">{status}</p>
         </div>
 
-        {/* Chat Area */}
-        <div className="flex-1 min-h-0 bg-black/30 border border-[#c9a84c]/10 rounded-xl overflow-y-auto p-3 space-y-3 scrollbar-thin">
+        {/* Chat Area (Vaste hoogte, scrolt vanbinnen) */}
+        <div className="w-full h-[35vh] min-h-[250px] bg-black/30 border border-[#c9a84c]/10 rounded-xl overflow-y-auto p-3 space-y-3 scrollbar-thin mb-4">
           {messages.map((msg, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
               <div className={`max-w-[90%] px-3 py-2 rounded-xl text-[0.8rem] leading-relaxed ${msg.role === 'user' ? 'bg-white/5 border border-white/10 rounded-br-none italic text-white/80' : 'bg-gradient-to-br from-[#c9a84c]/10 to-[#c9a84c]/5 border border-[#c9a84c]/20 rounded-bl-none'}`}>
@@ -391,40 +399,16 @@ export default function App() {
           <div ref={chatEndRef} />
         </div>
 
-        {/* Footer */}
-        <div className="shrink-0 flex items-center justify-between mt-2 pt-2 border-t border-[#c9a84c]/10">
-          <div className="flex items-center gap-1.5 text-[#c9a84c] font-bold text-sm bg-[#c9a84c]/10 px-3 py-1 rounded-full border border-[#c9a84c]/20">
-            <Trophy size={14} /> {score}
+        {/* Grote knoppen onderaan (Tweetalig) */}
+        <div className="flex flex-col gap-3">
+          
+          <div className="flex items-center justify-between border-b border-[#c9a84c]/10 pb-3">
+            <div className="flex items-center gap-1.5 text-[#c9a84c]/60 text-[0.6rem] uppercase tracking-widest">
+              <Trophy size={12} /> Score · Punteggio
+            </div>
+            <div className="text-[#c9a84c] font-bold text-lg">⭐ {score}</div>
           </div>
-          <div className="flex gap-1.5">
-            <button type="button" onClick={startNewConversation} className="p-1.5 bg-[#c9a84c]/5 border border-[#c9a84c]/10 rounded-md text-[#c9a84c]/60 flex items-center gap-1">
-              <RotateCcw size={14} />
-            </button>
-            <button type="button" onClick={downloadTranscript} className="p-1.5 bg-[#c9a84c]/5 border border-[#c9a84c]/10 rounded-md text-[#c9a84c]/60">
-              <Save size={14} />
-            </button>
-            <button type="button" onClick={() => setShowKeyModal(true)} className="p-1.5 bg-[#c9a84c]/5 border border-[#c9a84c]/10 rounded-md text-[#c9a84c]/60">
-              <Key size={14} />
-            </button>
-          </div>
-        </div>
 
-      </div>
-
-      <AnimatePresence>
-        {showKeyModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-[#12122a] border border-[#c9a84c]/30 p-6 rounded-2xl w-full max-w-xs shadow-2xl">
-              <h2 className="font-serif text-xl text-[#e8c97a] mb-2 text-center">API Key</h2>
-              <input type="password" defaultValue={customKey} id="keyInput" className="w-full bg-black/40 border border-[#c9a84c]/20 rounded-lg px-4 py-2.5 text-sm mb-4 outline-none text-white" />
-              <div className="flex gap-2">
-                <button onClick={() => setShowKeyModal(false)} className="flex-1 py-2 text-xs text-[#c9a84c]/50 border border-transparent rounded-lg">Annuleren</button>
-                <button onClick={() => { saveCustomKey((document.getElementById('keyInput') as HTMLInputElement).value); }} className="flex-1 py-2 bg-gradient-to-r from-[#c9a84c] to-[#8b6010] rounded-lg text-[#080810] text-xs font-bold">Opslaan</button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-      }
+          {/* GROTE Nieuw Gesprek Knop */}
+          <button 
+            type="button" onClick={s
