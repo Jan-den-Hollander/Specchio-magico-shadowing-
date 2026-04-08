@@ -411,4 +411,47 @@ export default function App() {
 
           {/* GROTE Nieuw Gesprek Knop */}
           <button 
-            type="button" onClick={s
+            type="button" onClick={startNewConversation} 
+            className="w-full py-3 border border-[#c9a84c]/30 bg-[#c9a84c]/5 rounded-xl text-[0.7rem] tracking-[0.2em] uppercase text-[#c9a84c] hover:bg-[#c9a84c]/10 flex flex-col items-center justify-center gap-1"
+          >
+            <div className="flex items-center gap-2"><RotateCcw size={14} /> Nieuw Gesprek</div>
+            <span className="text-[0.55rem] opacity-60">Nuova Conversazione</span>
+          </button>
+
+          <div className="flex gap-2">
+            <button 
+              type="button" onClick={downloadTranscript} 
+              className="flex-1 py-2 border border-[#c9a84c]/10 rounded-lg text-[0.6rem] tracking-widest uppercase text-[#c9a84c]/60 hover:text-[#c9a84c] flex flex-col items-center gap-0.5"
+            >
+              <div className="flex items-center gap-1"><Save size={12} /> Opslaan</div>
+              <span className="text-[0.45rem] opacity-60">Salva Testo</span>
+            </button>
+            <button 
+              type="button" onClick={() => setShowKeyModal(true)} 
+              className="px-4 py-2 border border-[#c9a84c]/10 rounded-lg text-[0.6rem] text-[#c9a84c]/60 hover:text-[#c9a84c] flex flex-col items-center gap-0.5"
+            >
+              <Key size={12} />
+              <span className="text-[0.45rem] opacity-60 uppercase tracking-widest">API</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {showKeyModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-[#12122a] border border-[#c9a84c]/30 p-6 rounded-2xl w-full max-w-xs shadow-2xl">
+              <h2 className="font-serif text-xl text-[#e8c97a] mb-2 text-center">API Key</h2>
+              <input type="password" defaultValue={customKey} id="keyInput" className="w-full bg-black/40 border border-[#c9a84c]/20 rounded-lg px-4 py-2.5 text-sm mb-4 outline-none text-white" />
+              <div className="flex gap-2">
+                <button onClick={() => setShowKeyModal(false)} className="flex-1 py-2 text-xs text-[#c9a84c]/50 border border-transparent rounded-lg">Annuleren</button>
+                <button onClick={() => { saveCustomKey((document.getElementById('keyInput') as HTMLInputElement).value); }} className="flex-1 py-2 bg-gradient-to-r from-[#c9a84c] to-[#8b6010] rounded-lg text-[#080810] text-xs font-bold">Opslaan</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+                 }
