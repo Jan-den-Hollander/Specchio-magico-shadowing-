@@ -248,6 +248,13 @@ export default function App() {
           >
             Specchio
           </motion.h1>
+          <a
+  href="#guida"
+  className="text-[0.55rem] tracking-[0.15em] uppercase opacity-40 hover:opacity-80 transition-opacity mt-1 block"
+  style={{ color: 'inherit' }}
+>
+  Come iniziare · Hoe te beginnen · How to start ↓
+</a>
           <p className="text-[0.6rem] tracking-[0.2em] uppercase text-[#c9a84c]/50 mt-1">
             Jouw Italiaanse partner
           </p>
