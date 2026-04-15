@@ -22,14 +22,12 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-// Initialize Gemini AI
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 interface Message {
   role: 'user' | 'model';
   it: string;
   nl: string;
-  ph?: string;
   score?: number;
   heard?: string;
 }
@@ -52,6 +50,16 @@ export default function App() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+
+  // ✅ FIX 1: Hulpfunctie om AudioContext te initialiseren of te hervatten.
+  // Dit zorgt dat Safari audio toestaat na een asynchrone pauze (AI-wachttijd).
+  const ensureAudioContext = () => {
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
+    } else if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+  };
 
   const getAI = () => {
     const key = customKey || process.env.GEMINI_API_KEY || "";
@@ -79,9 +87,7 @@ export default function App() {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
       }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
+      if (videoRef.current) videoRef.current.srcObject = null;
       setIsCamOn(false);
       setStatus('Spiegel uit · Specchio disattivato');
     } else {
@@ -108,19 +114,26 @@ export default function App() {
     }
   };
 
+  // ✅ FIX 2: Alleen de Italiaanse tekst meegeven, geen Engelse instructietekst.
+  // ✅ FIX 3: speechConfig met Italiaanse stem (Aoede) toegevoegd.
   const speakIt = async (text: string) => {
     if (!text) return;
     setIsSpeaking(true);
     setStatus('De spiegel spreekt... · Lo specchio parla...');
-
     try {
       const aiInstance = getAI();
       const response = await aiInstance.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `Say clearly in Italian: ${text}` }] }],
-        config: { responseModalities: [Modality.AUDIO], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } } },
+        contents: [{ parts: [{ text }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: "Aoede" }
+            }
+          }
+        },
       });
-
       const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (base64Audio) {
         if (!audioContextRef.current) {
@@ -130,18 +143,15 @@ export default function App() {
         const len = binaryString.length;
         const bytes = new Uint8Array(len);
         for (let i = 0; i < len; i++) { bytes[i] = binaryString.charCodeAt(i); }
-        
         const int16Data = new Int16Array(bytes.buffer);
         const float32Data = new Float32Array(int16Data.length);
         for (let i = 0; i < int16Data.length; i++) { float32Data[i] = int16Data[i] / 32768.0; }
-
         const audioBuffer = audioContextRef.current.createBuffer(1, float32Data.length, 24000);
         audioBuffer.getChannelData(0).set(float32Data);
-
         const source = audioContextRef.current.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioContextRef.current.destination);
-        source.onended = () => { setIsSpeaking(false); setStatus('Druk 🎤 om te antwoorden'); };
+        source.onended = () => { setIsSpeaking(false); setStatus('Druk 🎤 om te antwoorden · Premi 🎤 per rispondere'); };
         source.start();
       } else {
         throw new Error("No audio data received");
@@ -155,21 +165,21 @@ export default function App() {
     }
   };
 
+  // ✅ FIX 4: ensureAudioContext() aangeroepen bij de microfoonklik (Safari-fix).
   const startRecording = () => {
+    ensureAudioContext();
     try {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (!SpeechRecognition) { setStatus('Spraakherkenning niet ondersteund.'); return; }
       if (window.speechSynthesis) window.speechSynthesis.cancel();
       if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch(e) {} }
-
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.lang = 'it-IT';
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
-
       recognitionRef.current.onstart = () => { setIsRecording(true); setStatus('Ik luister... · Ti ascolto...'); };
       recognitionRef.current.onresult = (event: any) => { setIsRecording(false); processHeard(event.results[0][0].transcript); };
-      recognitionRef.current.onerror = (event: any) => { setIsRecording(false); setStatus('Microfoon fout.'); };
+      recognitionRef.current.onerror = () => { setIsRecording(false); setStatus('Microfoon fout.'); };
       recognitionRef.current.onend = () => { setIsRecording(false); };
       recognitionRef.current.start();
     } catch (err: any) { setStatus('Kon microfoon niet starten.'); setIsRecording(false); }
@@ -199,32 +209,47 @@ export default function App() {
     return 0.5;
   };
 
+  // ✅ FIX 5: Systeemprompt in het Italiaans, geen 'ph' meer in het JSON.
+  // ✅ FIX 6: Modelnaam gecorrigeerd van "gemini-3-flash-preview" naar "gemini-2.5-flash".
   const generateAIResponse = async (history: Message[]) => {
-    setIsThinking(true); setStatus('De spiegel denkt na... · Lo specchio pensa...');
-    const systemPrompt = `You are a warm, spontaneous Italian conversation partner — like a magic mirror that speaks. 
-    Level: ${level}. Current Topic: ${topic}.
-    RULES: ONE short Italian sentence per turn (max 12 words). Always end with a question. RESPOND ONLY with valid JSON: {"it":"Italian sentence","nl":"Dutch translation","ph":"phonetic"}`;
+    setIsThinking(true);
+    setStatus('De spiegel denkt na... · Lo specchio pensa...');
+    const systemPrompt = `Sei un simpatico partner di conversazione in italiano — come uno specchio magico che parla.
+Livello: ${level}. Argomento attuale: ${topic}.
+REGOLE: UNA frase breve in italiano per turno (max 12 parole). Termina sempre con una domanda.
+Rispondi SOLO con JSON valido, senza spiegazioni o Markdown: {"it":"frase in italiano","nl":"vertaling in het Nederlands"}`;
 
     const contents = history.map(m => ({
       role: m.role === 'user' ? 'user' : 'model',
-      parts: [{ text: m.role === 'user' ? m.it : JSON.stringify({ it: m.it, nl: m.nl, ph: m.ph }) }]
+      parts: [{ text: m.role === 'user' ? m.it : JSON.stringify({ it: m.it, nl: m.nl }) }]
     }));
 
     try {
       const aiInstance = getAI();
       const response = await aiInstance.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: contents.length > 0 ? contents : [{ role: 'user', parts: [{ text: 'Start de conversatie.' }] }],
+        model: "gemini-2.5-flash",
+        contents: contents.length > 0 ? contents : [{ role: 'user', parts: [{ text: 'Inizia la conversazione.' }] }],
         config: { systemInstruction: systemPrompt, responseMimeType: "application/json" },
       });
       const data = JSON.parse(response.text || "{}");
-      const aiMsg: Message = { role: 'model', it: data.it || "Ciao!", nl: data.nl || "Hallo!", ph: data.ph || "" };
+      // ✅ FIX 7: Geen 'ph' meer in het opgeslagen AI-bericht
+      const aiMsg: Message = { role: 'model', it: data.it || "Ciao!", nl: data.nl || "Hallo!" };
       setMessages(prev => [...prev, aiMsg]);
-      setIsThinking(false); speakIt(aiMsg.it);
-    } catch (err) { setIsThinking(false); setStatus('Oeps, de spiegel is even wazig.'); }
+      setIsThinking(false);
+      speakIt(aiMsg.it);
+    } catch (err) {
+      setIsThinking(false);
+      setStatus('Oeps, de spiegel is even wazig.');
+    }
   };
 
-  const startNewConversation = () => { setMessages([]); setScore(0); generateAIResponse([]); };
+  // ✅ FIX 8: ensureAudioContext() ook aangeroepen bij "Nieuw Gesprek" (Safari-fix).
+  const startNewConversation = () => {
+    ensureAudioContext();
+    setMessages([]);
+    setScore(0);
+    generateAIResponse([]);
+  };
 
   const downloadTranscript = () => {
     if (messages.length === 0) return;
@@ -235,12 +260,10 @@ export default function App() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   };
 
-  // LAY-OUT DIE SCROLLT OP KLEINE SCHERMEN
   return (
     <div className="min-h-screen w-full bg-[#080810] text-[#f5f0e8] font-sans selection:bg-[#c9a84c]/30 flex flex-col pb-8">
       <div className="flex flex-col max-w-md mx-auto w-full px-4 pt-4 relative z-10">
         
-        {/* Header */}
         <header className="text-center pb-4">
           <motion.h1 
             initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
@@ -249,18 +272,17 @@ export default function App() {
             Specchio
           </motion.h1>
           <a
-  href="#guida"
-  className="text-[0.55rem] tracking-[0.15em] uppercase opacity-40 hover:opacity-80 transition-opacity mt-1 block"
-  style={{ color: 'inherit' }}
->
-  Come iniziare · Hoe te beginnen · How to start ↓
-</a>
+            href="#guida"
+            className="text-[0.55rem] tracking-[0.15em] uppercase opacity-40 hover:opacity-80 transition-opacity mt-1 block"
+            style={{ color: 'inherit' }}
+          >
+            Come iniziare · Hoe te beginnen · How to start ↓
+          </a>
           <p className="text-[0.6rem] tracking-[0.2em] uppercase text-[#c9a84c]/50 mt-1">
             Jouw Italiaanse partner
           </p>
         </header>
 
-        {/* Mirror Section */}
         <div className="relative mx-auto w-full max-w-[200px] aspect-[3/4] mb-5">
           <div className="absolute inset-0 bg-gradient-to-br from-[#7a5810] via-[#c9a84c] to-[#5a3e08] rounded-[50%_50%_46%_46%_/_28%_28%_72%_72%] p-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.8)]">
             <div className="w-full h-full bg-[#111128] rounded-[47%_47%_44%_44%_/_26%_26%_74%_74%] overflow-hidden relative">
@@ -281,7 +303,6 @@ export default function App() {
               </AnimatePresence>
             </div>
           </div>
-          
           <button 
             type="button" onClick={(e) => { e.preventDefault(); toggleCam(); }}
             className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#080810] border border-[#c9a84c]/30 px-3 py-1.5 rounded-full text-[0.55rem] tracking-widest uppercase text-[#c9a84c]/80 flex flex-col items-center gap-0.5 z-20 w-[120px] text-center"
@@ -294,7 +315,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* Settings Row (Tweetalig) */}
         <div className="grid grid-cols-2 gap-2 mb-4">
           <div className="space-y-1">
             <label className="text-[0.55rem] uppercase tracking-widest text-[#c9a84c]/50 ml-1 flex items-center gap-1">
@@ -327,7 +347,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Action Row (Tweetalig) */}
         <div className="flex items-center justify-center gap-6 mb-2">
           <div className="flex flex-col items-center gap-1">
             <button 
@@ -372,16 +391,15 @@ export default function App() {
           <p className="text-[0.65rem] text-[#c9a84c]/60 min-h-[1em] italic font-medium">{status}</p>
         </div>
 
-        {/* Chat Area (Vaste hoogte, scrolt vanbinnen) */}
         <div className="w-full h-[35vh] min-h-[250px] bg-black/30 border border-[#c9a84c]/10 rounded-xl overflow-y-auto p-3 space-y-3 scrollbar-thin mb-4">
           {messages.map((msg, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
               <div className={`max-w-[90%] px-3 py-2 rounded-xl text-[0.8rem] leading-relaxed ${msg.role === 'user' ? 'bg-white/5 border border-white/10 rounded-br-none italic text-white/80' : 'bg-gradient-to-br from-[#c9a84c]/10 to-[#c9a84c]/5 border border-[#c9a84c]/20 rounded-bl-none'}`}>
                 {msg.role === 'model' ? (
                   <>
+                    {/* ✅ FIX 9: Alleen Italiaanse zin + Nederlandse vertaling. Geen fonetiek meer. */}
                     <span className="font-serif italic text-base text-[#e8c97a] block mb-0.5">{msg.it}</span>
                     <span className="text-[0.65rem] text-white/40 block leading-tight">{msg.nl}</span>
-                    {msg.ph && <span className="text-[0.6rem] text-[#c9a84c]/50 italic block mt-1">/{msg.ph}/</span>}
                   </>
                 ) : (
                   <>
@@ -406,9 +424,7 @@ export default function App() {
           <div ref={chatEndRef} />
         </div>
 
-        {/* Grote knoppen onderaan (Tweetalig) */}
         <div className="flex flex-col gap-3">
-          
           <div className="flex items-center justify-between border-b border-[#c9a84c]/10 pb-3">
             <div className="flex items-center gap-1.5 text-[#c9a84c]/60 text-[0.6rem] uppercase tracking-widest">
               <Trophy size={12} /> Score · Punteggio
@@ -416,9 +432,8 @@ export default function App() {
             <div className="text-[#c9a84c] font-bold text-lg">⭐ {score}</div>
           </div>
 
-          {/* GROTE Nieuw Gesprek Knop */}
           <button 
-            type="button" onClick={startNewConversation} 
+            type="button" onClick={startNewConversation}
             className="w-full py-3 border border-[#c9a84c]/30 bg-[#c9a84c]/5 rounded-xl text-[0.7rem] tracking-[0.2em] uppercase text-[#c9a84c] hover:bg-[#c9a84c]/10 flex flex-col items-center justify-center gap-1"
           >
             <div className="flex items-center gap-2"><RotateCcw size={14} /> Nieuw Gesprek</div>
@@ -427,21 +442,20 @@ export default function App() {
 
           <div className="flex gap-2">
             <button 
-              type="button" onClick={downloadTranscript} 
+              type="button" onClick={downloadTranscript}
               className="flex-1 py-2 border border-[#c9a84c]/10 rounded-lg text-[0.6rem] tracking-widest uppercase text-[#c9a84c]/60 hover:text-[#c9a84c] flex flex-col items-center gap-0.5"
             >
               <div className="flex items-center gap-1"><Save size={12} /> Opslaan</div>
               <span className="text-[0.45rem] opacity-60">Salva Testo</span>
             </button>
             <button 
-              type="button" onClick={() => setShowKeyModal(true)} 
+              type="button" onClick={() => setShowKeyModal(true)}
               className="px-4 py-2 border border-[#c9a84c]/10 rounded-lg text-[0.6rem] text-[#c9a84c]/60 hover:text-[#c9a84c] flex flex-col items-center gap-0.5"
             >
               <Key size={12} />
               <span className="text-[0.45rem] opacity-60 uppercase tracking-widest">API</span>
             </button>
           </div>
-
         </div>
       </div>
 
@@ -461,17 +475,17 @@ export default function App() {
       </AnimatePresence>
       <GuidaSection accentColor="#c9a84c" />
       <div style={{
-  textAlign: 'center',
-  padding: '1.5rem 1rem 2rem',
-  fontSize: '0.72rem',
-  lineHeight: 1.8,
-  color: 'white',
-  opacity: 0.85,
-}}>
-  🇮🇹 Questa app è gratuita. Se la usi spesso, ti consigliamo di creare la tua chiave API personale — è facile e gratuita su aistudio.google.com.<br /><br />
-  🇳🇱 Deze app is gratis. Gebruik je hem regelmatig, maak dan je eigen API-sleutel aan — eenvoudig en gratis via aistudio.google.com.<br /><br />
-  🇬🇧 This app is free to use. If you use it regularly, we recommend creating your own API key — quick and free at aistudio.google.com.
-</div>
+        textAlign: 'center',
+        padding: '1.5rem 1rem 2rem',
+        fontSize: '0.72rem',
+        lineHeight: 1.8,
+        color: 'white',
+        opacity: 0.85,
+      }}>
+        🇮🇹 Questa app è gratuita. Se la usi spesso, ti consigliamo di creare la tua chiave API personale — è facile e gratuita su aistudio.google.com.<br /><br />
+        🇳🇱 Deze app is gratis. Gebruik je hem regelmatig, maak dan je eigen API-sleutel aan — eenvoudig en gratis via aistudio.google.com.<br /><br />
+        🇬🇧 This app is free to use. If you use it regularly, we recommend creating your own API key — quick and free at aistudio.google.com.
+      </div>
     </div>
   );
 }
