@@ -426,7 +426,7 @@ Rispondi SOLO con JSON valido, senza spiegazioni o Markdown: {"it":"frase in ita
         </div>
 
         {/* Chat */}
-        <div className="w-full h-[35vh] min-h-[250px] bg-black/30 border border-[#c9a84c]/10 rounded-xl overflow-y-auto p-3 space-y-3 scrollbar-thin mb-4">
+        <div className="w-full h-[35vh] min-h-[250px] bg-black/30 border border-[#c9a84c]/10 rounded-xl overflow-y-auto p-3 flex flex-col-reverse gap-3 scrollbar-thin mb-4">
           <div ref={chatEndRef} />
 
           {messages.map((msg, i) => {
