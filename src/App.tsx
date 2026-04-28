@@ -427,6 +427,7 @@ Rispondi SOLO con JSON valido, senza spiegazioni o Markdown: {"it":"frase in ita
 
         {/* Chat */}
         <div className="w-full h-[35vh] min-h-[250px] bg-black/30 border border-[#c9a84c]/10 rounded-xl overflow-y-auto p-3 space-y-3 scrollbar-thin mb-4">
+          <div ref={chatEndRef} />
 
           {messages.map((msg, i) => {
 
@@ -520,7 +521,7 @@ Rispondi SOLO con JSON valido, senza spiegazioni o Markdown: {"it":"frase in ita
               <div className="w-1 h-1 bg-[#c9a84c] rounded-full animate-bounce [animation-delay:0.4s]" />
             </div>
           )}
-          <div ref={chatEndRef} />
+    
         </div>
 
         <div className="flex flex-col gap-3">
